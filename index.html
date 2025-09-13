@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fake Account Detector — Next‑Gen</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=Orbitron:wght@500;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg:#070815;
+      --glass:rgba(255,255,255,0.06);
+      --neon1:#6a5cff; /* purple */
+      --neon2:#00e5ff; /* teal */
+      --neon3:#37f;    /* blue */
+      --good:#22c55e;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+    }
+    html,body{height:100%}
+    body{
+      background: radial-gradient(1200px 800px at 80% -10%, rgba(102,51,255,0.25), transparent 60%),
+                  radial-gradient(1000px 600px at -10% 20%, rgba(0,229,255,0.18), transparent 60%),
+                  linear-gradient(180deg, #060713 0%, #0b0d1f 100%);
+      color:#e5e7eb;
+      font-family:'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      scroll-behavior: smooth;
+      overflow-x:hidden;
+    }
+    .neon-text{ text-shadow: 0 0 20px rgba(106,92,255,0.35), 0 0 45px rgba(55,119,255,0.25); }
+    .neon-ring{ box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 0 20px rgba(106,92,255,0.25), inset 0 0 10px rgba(255,255,255,0.04); }
+    .btn-neon{
+      background: linear-gradient(135deg, rgba(106,92,255,0.18), rgba(0,229,255,0.15));
+      border:1px solid rgba(106,92,255,0.35);
+      box-shadow: 0 0 20px rgba(106,92,255,0.35), inset 0 0 10px rgba(0,229,255,0.08);
+      transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+    }
+    .btn-neon:hover{
+      transform: translateY(-2px);
+      filter: brightness(1.15);
+      box-shadow: 0 0 28px rgba(0,229,255,0.55), 0 0 44px rgba(106,92,255,0.35);
+    }
+    .btn-primary{
+      background: linear-gradient(120deg, var(--neon1), var(--neon2));
+      color:#0b0d1f;
+      font-weight:800;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      box-shadow: 0 10px 35px rgba(106,92,255,0.45), 0 0 45px rgba(0,229,255,0.28);
+      transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .btn-primary:hover{ transform: translateY(-3px) scale(1.01); box-shadow: 0 15px 45px rgba(106,92,255,0.65), 0 0 60px rgba(0,229,255,0.45);}
+    .glass{
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      border:1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-radius: 18px;
+    }
+    .glow-red{ box-shadow: 0 0 0 1px rgba(239,68,68,0.25), 0 0 24px rgba(239,68,68,0.45) !important; }
+    .glow-green{ box-shadow: 0 0 0 1px rgba(34,197,94,0.25), 0 0 24px rgba(34,197,94,0.45) !important; }
+
+    /* Particle canvas spans entire hero */
+    #particleCanvas{ position:absolute; inset:0; z-index:0; filter: blur(0.4px) saturate(1.2); opacity:0.75; }
+
+    /* Section reveal animations */
+    .reveal{ opacity:0; transform: translateY(18px) scale(0.98); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.visible{ opacity:1; transform: translateY(0) scale(1); }
+
+    /* Tooltip */
+    .tooltip{
+      position: fixed;
+      pointer-events: none;
+      z-index: 60;
+      padding: 8px 10px;
+      font-size:12px;
+      border-radius:10px;
+      background: rgba(14,18,38,0.92);
+      border:1px solid rgba(106,92,255,0.35);
+      color:#eaf2ff;
+      box-shadow: 0 0 18px rgba(0,229,255,0.25);
+      max-width: 260px;
+    }
+
+    /* Active nav indicator */
+    .nav-active{
+      color: #e5f0ff;
+      text-shadow: 0 0 12px rgba(0,229,255,0.65);
+    }
+
+    /* Table styles */
+    .table-head{ background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); }
+    .table-row{ transition: background .2s ease, transform .15s ease; }
+    .table-row:hover{ background: rgba(255,255,255,0.04); transform: translateY(-1px); }
+
+    /* Chatbot */
+    .chat-shadow{ box-shadow: 0 15px 40px rgba(0,229,255,0.25), 0 0 0 1px rgba(106,92,255,0.25); }
+
+    /* Progress shimmer */
+    .shimmer{
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.05) 75%);
+      background-size: 200% 100%;
+      animation: shimmerMove 1.2s linear infinite;
+    }
+    @keyframes shimmerMove{
+      from{background-position:200% 0}
+      to{background-position:-200% 0}
+    }
+
+    /* Small helpers */
+    .badge{
+      border:1px solid rgba(255,255,255,0.12);
+      padding:4px 10px;
+      border-radius:999px;
+      background: rgba(255,255,255,0.04);
+    }
+
+    /* Mobile tweaks for drag-drop */
+    @media (max-width:640px){
+      #dropzone{ padding: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sticky Nav -->
+  <header class="fixed top-0 left-0 right-0 z-40">
+    <div class="mx-auto max-w-7xl px-4">
+      <div class="mt-4 mb-3 glass neon-ring flex items-center justify-between px-4 py-3">
+        <div class="flex items-center gap-3">
+          <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-[var(--neon2)] to-[var(--neon1)] animate-pulse"></div>
+          <div class="leading-tight">
+            <div class="font-extrabold text-lg tracking-wide" style="font-family:'Orbitron', sans-serif;">Sentinel.AI</div>
+            <div class="text-xs text-slate-300">Fake Account Detection</div>
+          </div>
+        </div>
+        <nav class="hidden md:flex items-center gap-6 text-sm">
+          <a href="#hero" class="nav-link text-slate-300 hover:text-white">Home</a>
+          <a href="#upload" class="nav-link text-slate-300 hover:text-white">Upload</a>
+          <a href="#dashboard" class="nav-link text-slate-300 hover:text-white">Dashboard</a>
+          <a href="#how" class="nav-link text-slate-300 hover:text-white">How It Works</a>
+          <a href="#contact" class="nav-link text-slate-300 hover:text-white">Contact</a>
+        </nav>
+        <button id="menuBtn" aria-label="Open menu" class="md:hidden btn-neon rounded-xl px-3 py-2 text-sm">Menu</button>
+      </div>
+      <div id="mobileMenu" class="hidden md:hidden glass neon-ring px-4 py-3 mb-3">
+        <div class="flex flex-col gap-3">
+          <a href="#hero" class="nav-link text-slate-300 hover:text-white">Home</a>
+          <a href="#upload" class="nav-link text-slate-300 hover:text-white">Upload</a>
+          <a href="#dashboard" class="nav-link text-slate-300 hover:text-white">Dashboard</a>
+          <a href="#how" class="nav-link text-slate-300 hover:text-white">How It Works</a>
+          <a href="#contact" class="nav-link text-slate-300 hover:text-white">Contact</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section id="hero" class="relative min-h-[92vh] flex items-center">
+    <canvas id="particleCanvas"></canvas>
+    <div class="relative z-10 mx-auto max-w-7xl px-6 pt-28 pb-12">
+      <div class="grid md:grid-cols-2 gap-10 items-center">
+        <div class="reveal">
+          <div class="inline-flex items-center gap-2 badge mb-4">
+            <span class="h-2 w-2 rounded-full bg-[var(--neon2)] animate-ping"></span>
+            Live Demo • Batch AI Analysis
+          </div>
+          <h1 class="text-4xl md:text-6xl font-extrabold mb-4 leading-tight neon-text" style="font-family:'Orbitron', sans-serif;">
+            Detect Fake Accounts in Seconds.
+          </h1>
+          <p class="text-slate-300 text-lg md:text-xl mb-8">
+            AI-powered detection with batch analysis and instant insights. Upload a CSV to analyze accounts with transparent explanations.
+          </p>
+          <div class="flex flex-wrap items-center gap-4">
+            <label for="fileInput" class="cursor-pointer btn-primary rounded-2xl px-6 py-3">Upload CSV</label>
+            <button class="btn-neon rounded-2xl px-6 py-3" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">Learn More</button>
+            <input id="fileInput" type="file" accept=".csv" class="hidden" />
+          </div>
+          <div class="mt-6 text-xs text-slate-400">
+            Try with your CSV or drop it into the upload area below. Sample format: username,followers,following,created,posts
+          </div>
+        </div>
+        <div class="reveal">
+          <div class="glass neon-ring p-6 md:p-8 rounded-2xl">
+            <div class="flex items-center justify-between">
+              <div class="font-semibold text-slate-200">Realtime Analytics</div>
+              <div class="text-xs text-slate-400">Auto-updates</div>
+            </div>
+            <div class="grid grid-cols-3 gap-4 mt-6">
+              <div class="p-4 rounded-xl glass text-center">
+                <div class="text-2xl font-extrabold text-[var(--good)]" id="statReal">0</div>
+                <div class="text-xs text-slate-400">Real</div>
+              </div>
+              <div class="p-4 rounded-xl glass text-center">
+                <div class="text-2xl font-extrabold text-[var(--bad)]" id="statFake">0</div>
+                <div class="text-xs text-slate-400">Fake</div>
+              </div>
+              <div class="p-4 rounded-xl glass text-center">
+                <div class="text-2xl font-extrabold text-[var(--neon2)]" id="statTotal">0</div>
+                <div class="text-xs text-slate-400">Total</div>
+              </div>
+            </div>
+            <div class="mt-6 h-44">
+              <canvas id="heroSpark" class="w-full h-full"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls Row -->
+      <div class="reveal mt-8 flex flex-wrap items-center gap-4">
+        <div class="glass neon-ring px-4 py-2 rounded-xl flex items-center gap-3">
+          <span class="text-slate-300 text-sm">Ambient Cyber Sound</span>
+          <label class="inline-flex items-center cursor-pointer gap-2">
+            <input id="soundToggle" type="checkbox" class="sr-only" />
+            <span class="w-11 h-6 bg-slate-700 rounded-full relative">
+              <span id="soundKnob" class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-all"></span>
+            </span>
+          </label>
+          <span id="soundNote" class="text-xs text-slate-400">Simulated (audio not supported here)</span>
+        </div>
+
+        <div class="glass neon-ring px-4 py-2 rounded-xl flex items-center gap-3">
+          <span class="text-slate-300 text-sm">Assistant</span>
+          <button id="botOpen" class="btn-neon rounded-xl px-3 py-1 text-sm">Open</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Upload & Analysis -->
+  <section id="upload" class="mx-auto max-w-7xl px-6 py-14">
+    <div class="reveal grid lg:grid-cols-3 gap-8 items-start">
+      <div class="lg:col-span-1">
+        <div class="glass neon-ring p-6">
+          <h3 class="text-xl font-bold mb-2" style="font-family:'Orbitron'">Batch Analysis</h3>
+          <p class="text-slate-300 text-sm">Drag in a CSV to begin. We’ll compute risk scores and explanations for each account.</p>
+          <div id="dropzone" class="mt-5 p-8 border border-dashed rounded-2xl neon-ring text-center hover:scale-[1.01] transition">
+            <div class="mx-auto mb-3">
+              <svg width="44" height="44" viewBox="0 0 24 24" class="mx-auto text-[var(--neon2)]"><path fill="currentColor" d="M12 16V7.83l2.59 2.58L16 9l-4-4l-4 4l1.41 1.41L11 7.83V16h1z"/><path fill="currentColor" d="M20 18H4v-2h16v2z"/></svg>
+            </div>
+            <div class="font-semibold">Drop CSV here</div>
+            <div class="text-xs text-slate-400 mt-1">or click “Upload CSV” above</div>
+          </div>
+
+          <div class="mt-6">
+            <div class="text-sm text-slate-300 mb-1">Progress</div>
+            <div class="w-full h-3 rounded-full bg-slate-800 overflow-hidden neon-ring">
+              <div id="progressBar" class="h-full w-0 bg-gradient-to-r from-[var(--neon2)] to-[var(--neon1)] shimmer"></div>
+            </div>
+            <div id="progressText" class="text-xs text-slate-400 mt-2">Waiting for file...</div>
+          </div>
+        </div>
+
+        <div class="glass neon-ring p-6 mt-6">
+          <h4 class="font-semibold mb-2">Search & Filters</h4>
+          <input id="searchInput" type="text" placeholder="Search username..." class="w-full bg-transparent border border-slate-700 focus:border-[var(--neon2)] outline-none rounded-xl px-3 py-2"/>
+          <div class="flex gap-2 mt-3">
+            <button id="filterAll" class="btn-neon rounded-xl px-3 py-2 text-sm">All</button>
+            <button id="filterReal" class="btn-neon rounded-xl px-3 py-2 text-sm">Real</button>
+            <button id="filterFake" class="btn-neon rounded-xl px-3 py-2 text-sm">Fake</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-2">
+        <div class="glass neon-ring p-4">
+          <div class="flex items-center justify-between px-2">
+            <div class="font-semibold">Results</div>
+            <div class="text-xs text-slate-400">Click headers to sort</div>
+          </div>
+          <div class="overflow-x-auto mt-3">
+            <table class="w-full text-sm">
+              <thead class="table-head">
+                <tr>
+                  <th class="text-left px-4 py-3 cursor-pointer" data-sort="username">Username</th>
+                  <th class="text-left px-4 py-3 cursor-pointer" data-sort="followers">Followers</th>
+                  <th class="text-left px-4 py-3 cursor-pointer" data-sort="following">Following</th>
+                  <th class="text-left px-4 py-3 cursor-pointer" data-sort="created">Created</th>
+                  <th class="text-left px-4 py-3 cursor-pointer" data-sort="posts">Posts</th>
+                  <th class="text-left px-4 py-3 cursor-pointer" data-sort="score">Risk</th>
+                  <th class="text-left px-4 py-3">Why</th>
+                </tr>
+              </thead>
+              <tbody id="resultBody"></tbody>
+            </table>
+          </div>
+          <div class="flex items-center justify-between mt-4 px-2">
+            <div class="text-xs text-slate-400" id="paginationInfo">0–0 of 0</div>
+            <div class="flex items-center gap-2">
+              <button id="prevPage" class="btn-neon rounded-lg px-3 py-1 text-sm">Prev</button>
+              <div id="pageNum" class="text-sm">1</div>
+              <button id="nextPage" class="btn-neon rounded-lg px-3 py-1 text-sm">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dashboard -->
+  <section id="dashboard" class="mx-auto max-w-7xl px-6 pb-14">
+    <div class="reveal mb-6">
+      <div class="flex items-center justify-between">
+        <h3 class="text-2xl font-extrabold" style="font-family:'Orbitron'">Interactive Analytics</h3>
+        <div class="text-xs text-slate-400">Charts animate as data arrives</div>
+      </div>
+    </div>
+    <div class="grid lg:grid-cols-3 gap-8">
+      <div class="reveal glass neon-ring p-5">
+        <div class="flex items-center justify-between mb-2">
+          <div class="font-semibold">Real vs Fake (Donut)</div>
+          <div class="badge">Distribution</div>
+        </div>
+        <div class="h-64"><canvas id="donutChart"></canvas></div>
+      </div>
+      <div class="reveal glass neon-ring p-5">
+        <div class="flex items-center justify-between mb-2">
+          <div class="font-semibold">Real vs Fake (Pie)</div>
+          <div class="badge">Share</div>
+        </div>
+        <div class="h-64"><canvas id="pieChart"></canvas></div>
+      </div>
+      <div class="reveal glass neon-ring p-5">
+        <div class="flex items-center justify-between mb-2">
+          <div class="font-semibold">Risk Buckets (Bar)</div>
+          <div class="badge">Low / Med / High</div>
+        </div>
+        <div class="h-64"><canvas id="barChart"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it Works -->
+  <section id="how" class="mx-auto max-w-7xl px-6 pb-14">
+    <div class="reveal text-center mb-10">
+      <h3 class="text-2xl font-extrabold mb-2" style="font-family:'Orbitron'">How It Works</h3>
+      <p class="text-slate-300">Three simple steps from upload to insight.</p>
+    </div>
+    <div class="grid md:grid-cols-3 gap-8">
+      <div class="reveal group glass neon-ring p-6 relative overflow-hidden">
+        <div class="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-[var(--neon2)] opacity-10 blur-2xl group-hover:opacity-20 transition"></div>
+        <div class="flex items-center gap-3 mb-3">
+          <svg width="28" height="28" viewBox="0 0 24 24" class="text-[var(--neon2)]"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7l7-7zM5 18h14v2H5z"/></svg>
+          <div class="font-semibold">Upload</div>
+        </div>
+        <p class="text-slate-300 text-sm">Drop your CSV or pick a file. We validate and prepare data instantly.</p>
+      </div>
+      <div class="reveal group glass neon-ring p-6 relative overflow-hidden">
+        <div class="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-[var(--neon1)] opacity-10 blur-2xl group-hover:opacity-20 transition"></div>
+        <div class="flex items-center gap-3 mb-3">
+          <svg width="28" height="28" viewBox="0 0 24 24" class="text-[var(--neon1)]"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7v2H3l3.89 3.89L10.78 11H8V9a4 4 0 0 1 8 0v2h-2.78l3.89 3.89L21 11h-2V9a7 7 0 0 0-7-7z"/></svg>
+          <div class="font-semibold">AI Scan</div>
+        </div>
+        <p class="text-slate-300 text-sm">Heuristics and signals estimate risk and surface reasons for flags.</p>
+      </div>
+      <div class="reveal group glass neon-ring p-6 relative overflow-hidden">
+        <div class="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-[var(--neon3)] opacity-10 blur-2xl group-hover:opacity-20 transition"></div>
+        <div class="flex items-center gap-3 mb-3">
+          <svg width="28" height="28" viewBox="0 0 24 24" class="text-[var(--neon3)]"><path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          <div class="font-semibold">Results</div>
+        </div>
+        <p class="text-slate-300 text-sm">View sortable tables and animated charts with clear insights.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact -->
+  <section id="contact" class="mx-auto max-w-7xl px-6 pb-16">
+    <div class="reveal grid md:grid-cols-2 gap-8">
+      <div class="glass neon-ring p-6">
+        <h3 class="text-xl font-extrabold mb-1" style="font-family:'Orbitron'">Contact (Demo)</h3>
+        <p class="text-slate-300 text-sm mb-5">This is a demo form with client-side validation only. No messages are sent.</p>
+        <form id="contactForm" class="space-y-4" novalidate>
+          <div>
+            <label class="text-sm text-slate-300">Name</label>
+            <input id="cName" type="text" required placeholder="Your name" class="mt-1 w-full bg-transparent border border-slate-700 focus:border-[var(--neon2)] outline-none rounded-xl px-3 py-2"/>
+            <div id="errName" class="text-xs text-[var(--bad)] mt-1 hidden">Please enter your name</div>
+          </div>
+          <div>
+            <label class="text-sm text-slate-300">Email</label>
+            <input id="cEmail" type="email" required placeholder="you@example.com" class="mt-1 w-full bg-transparent border border-slate-700 focus:border-[var(--neon2)] outline-none rounded-xl px-3 py-2"/>
+            <div id="errEmail" class="text-xs text-[var(--bad)] mt-1 hidden">Please enter a valid email</div>
+          </div>
+          <div>
+            <label class="text-sm text-slate-300">Message</label>
+            <textarea id="cMsg" rows="4" required placeholder="How can we help?" class="mt-1 w-full bg-transparent border border-slate-700 focus:border-[var(--neon2)] outline-none rounded-xl px-3 py-2"></textarea>
+            <div id="errMsg" class="text-xs text-[var(--bad)] mt-1 hidden">Please enter a message</div>
+          </div>
+          <button class="btn-primary rounded-2xl px-6 py-3 w-full">Send Message</button>
+          <div id="contactToast" class="hidden mt-3 text-center text-sm text-[var(--neon2)]">Thanks! Your (demo) message was “sent”.</div>
+        </form>
+      </div>
+
+      <div class="glass neon-ring p-6">
+        <h3 class="text-xl font-extrabold mb-3" style="font-family:'Orbitron'">Links</h3>
+        <div class="flex flex-col gap-3">
+          <a href="#" class="btn-neon rounded-xl px-4 py-3 flex items-center gap-3">
+            <svg width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.58 2 12.26c0 4.52 2.87 8.35 6.84 9.7c.5.09.68-.22.68-.49c0-.24-.01-.87-.01-1.71c-2.78.62-3.37-1.37-3.37-1.37c-.45-1.18-1.11-1.5-1.11-1.5c-.91-.64.07-.63.07-.63c1 .07 1.53 1.05 1.53 1.05c.9 1.57 2.36 1.12 2.94.86c.09-.67.35-1.12.64-1.38c-2.22-.26-4.55-1.14-4.55-5.07c0-1.12.39-2.04 1.03-2.76c-.1-.26-.45-1.3.1-2.71c0 0 .84-.27 2.75 1.05c.8-.23 1.65-.35 2.5-.35c.85 0 1.7.12 2.5.35c1.9-1.32 2.74-1.05 2.74-1.05c.56 1.41.21 2.45.11 2.71c.64.72 1.02 1.64 1.02 2.76c0 3.94-2.34 4.8-4.57 5.06c.36.32.68.95.68 1.92c0 1.38-.01 2.49-.01 2.83c0 .27.18.59.69.49C19.14 20.61 22 16.78 22 12.26C22 6.58 17.52 2 12 2Z"/></svg>
+            GitHub
+          </a>
+          <a href="#" class="btn-neon rounded-xl px-4 py-3 flex items-center gap-3">
+            <svg width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M19 3a2.94 2.94 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a2.94 2.94 0 0 1 3-3Zm-1.5 3h-11A1.5 1.5 0 0 0 5 7.5v9A1.5 1.5 0 0 0 6.5 18h11a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 17.5 6ZM12 8a4 4 0 1 1-4 4a4 4 0 0 1 4-4Z"/></svg>
+            LinkedIn
+          </a>
+          <a href="mailto:hello@example.com" class="btn-neon rounded-xl px-4 py-3 flex items-center gap-3">
+            <svg width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M12 13L2 6.76V18h20V6.76zm0-2.2L2 4h20z"/></svg>
+            Email
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800">
+    <div class="mx-auto max-w-7xl px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-3">
+      <div class="text-sm text-slate-400">© 2025 Sentinel.AI — “Trust your network.”</div>
+      <div class="text-xs badge">Dark • Neon • Glass</div>
+    </div>
+  </footer>
+
+  <!-- Floating Chatbot -->
+  <div id="chatbot" class="fixed bottom-5 right-5 z-50">
+    <button id="chatToggle" class="btn-primary rounded-full w-14 h-14 flex items-center justify-center shadow-lg">
+      <svg width="22" height="22" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3C7.03 3 3 6.58 3 11c0 2.07.93 3.95 2.46 5.39L5 21l4.05-2.23c.91.25 1.87.38 2.95.38c4.97 0 9-3.58 9-8s-4.03-8-9-8z"/></svg>
+    </button>
+    <div id="chatPanel" class="hidden mt-3 w-80 glass neon-ring rounded-2xl p-4 chat-shadow">
+      <div class="flex items-center justify-between mb-2">
+        <div class="font-semibold">Assistant</div>
+        <button id="chatClose" class="text-slate-300 hover:text-white">×</button>
+      </div>
+      <div id="chatLog" class="h-48 overflow-y-auto space-y-3 pr-1">
+        <div class="text-xs text-slate-300">Hi! I can explain features. Ask me:</div>
+        <div class="flex flex-wrap gap-2 mt-1">
+          <button class="badge text-xs bot-q">How to upload?</button>
+          <button class="badge text-xs bot-q">How are fakes flagged?</button>
+          <button class="badge text-xs bot-q">What do charts show?</button>
+        </div>
+      </div>
+      <div class="mt-3 flex gap-2">
+        <input id="chatInput" type="text" placeholder="Type a question..." class="flex-1 bg-transparent border border-slate-700 rounded-xl px-3 py-2 text-sm focus:border-[var(--neon2)] outline-none"/>
+        <button id="chatSend" class="btn-neon rounded-xl px-3 py-2 text-sm">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Tooltip -->
+  <div id="tooltip" class="tooltip hidden"></div>
+
+  <script>
+    // Utilities
+    const $ = (s, d=document) => d.querySelector(s);
+    const $$ = (s, d=document) => Array.from(d.querySelectorAll(s));
+    const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
+    const fmt = new Intl.NumberFormat();
+
+    // Mobile menu
+    $('#menuBtn').addEventListener('click', ()=> $('#mobileMenu').classList.toggle('hidden'));
+
+    // Active nav highlight
+    const sections = ['hero','upload','dashboard','how','contact'].map(id=>document.getElementById(id));
+    const navLinks = $$('.nav-link');
+    const io = new IntersectionObserver(entries=>{
+      entries.forEach(e=>{
+        if(e.isIntersecting){
+          navLinks.forEach(a=>{
+            a.classList.toggle('nav-active', a.getAttribute('href')==='#'+e.target.id);
+          });
+        }
+      });
+    }, {threshold:0.6});
+    sections.forEach(s=>io.observe(s));
+
+    // Reveal on scroll
+    const revIO = new IntersectionObserver(entries=>{
+      entries.forEach(e=>{
+        if(e.isIntersecting){ e.target.classList.add('visible'); revIO.unobserve(e.target); }
+      });
+    }, {threshold:0.15});
+    $$('.reveal').forEach(el=>revIO.observe(el));
+
+    // Particle background
+    ;(function particles(){
+      const c = document.getElementById('particleCanvas');
+      const ctx = c.getContext('2d');
+      let w,h,px;
+      const dots=[];
+      function resize(){
+        w = c.width = c.clientWidth = c.parentElement.clientWidth;
+        h = c.height = c.clientHeight = c.parentElement.clientHeight;
+        px = Math.round((w*h)/26000); // density
+        while(dots.length<px){ dots.push(spawn()); }
+        if(dots.length>px) dots.length=px;
+      }
+      function spawn(){
+        return {
+          x: Math.random()*w,
+          y: Math.random()*h,
+          vx: (Math.random()-0.5)*0.4,
+          vy: (Math.random()-0.5)*0.4,
+          r: Math.random()*1.8+0.4,
+          c: Math.random()<0.5 ? 'rgba(0,229,255,0.8)' : 'rgba(106,92,255,0.8)'
+        }
+      }
+      function step(){
+        ctx.clearRect(0,0,w,h);
+        for(const d of dots){
+          d.x+=d.vx; d.y+=d.vy;
+          if(d.x<0||d.x>w) d.vx*=-1;
+          if(d.y<0||d.y>h) d.vy*=-1;
+          ctx.beginPath(); ctx.arc(d.x,d.y,d.r,0,Math.PI*2);
+          ctx.fillStyle=d.c; ctx.fill();
+        }
+        // links
+        for(let i=0;i<dots.length;i++){
+          for(let j=i+1;j<dots.length;j++){
+            const a=dots[i], b=dots[j];
+            const dx=a.x-b.x, dy=a.y-b.y, dist=dx*dx+dy*dy;
+            if(dist<120*120){
+              const o = 1 - Math.sqrt(dist)/120;
+              ctx.strokeStyle = `rgba(80,120,255,${o*0.18})`;
+              ctx.lineWidth = 1;
+              ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+            }
+          }
+        }
+        requestAnimationFrame(step);
+      }
+      window.addEventListener('resize', resize);
+      resize(); step();
+    })();
+
+    // Hero mini spark chart (fake activity)
+    let heroChart;
+    (function () {
+      const ctx = document.getElementById('heroSpark').getContext('2d');
+      const data = Array.from({length:30},()=>Math.random()*10+5);
+      heroChart = new Chart(ctx, {
+        type:'line',
+        data:{ labels:data.map((_,i)=>i), datasets:[{ data, borderColor:'#00e5ff', pointRadius:0, tension:0.35, fill:true, backgroundColor:'rgba(0,229,255,0.12)'}]},
+        options:{ plugins:{legend:{display:false}, tooltip:{enabled:false}}, scales:{x:{display:false}, y:{display:false}}, animation:{duration:900} }
+      });
+      setInterval(()=>{
+        data.shift(); data.push(5+Math.random()*12);
+        heroChart.update('none');
+      }, 1000);
+    })();
+
+    // CSV handling and analysis
+    const state = {
+      rows: [], // {id, username, followers, following, created, posts, score, fake, why}
+      filtered: [],
+      page: 1,
+      pageSize: 8,
+      sortKey: 'score',
+      sortDir: 'desc',
+      filter: 'all',
+      search: ''
+    };
+
+    const dropzone = $('#dropzone');
+    const fileInput = $('#fileInput');
+    const progressBar = $('#progressBar');
+    const progressText = $('#progressText');
+    const tbody = $('#resultBody');
+
+    function parseCSV(text){
+      const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      const out=[];
+      for(const line of lines){
+        const parts = line.split(',').map(s=>s.trim());
+        if(parts.length<5) continue;
+        const [username, followers, following, created, posts] = parts;
+        out.push({username, followers:+followers||0, following:+following||0, created, posts:+posts||0});
+      }
+      return out;
+    }
+
+    function analyze(row){
+      // Simple heuristics for demo
+      let score = 0;
+      const why = [];
+      if(row.followers<20 && row.posts<3){ score+=45; why.push('Very low followers and posts'); }
+      if(row.following>300 && row.followers<50){ score+=25; why.push('Following many accounts but ignored'); }
+      if(/202[3-5]|202\d/.test(row.created)){ score+=15; why.push('Very new account'); }
+      if(/test|bot|fake|promo|deal/i.test(row.username)){ score+=25; why.push('Suspicious keyword in username'); }
+      if(row.posts===0){ score+=20; why.push('No content posted'); }
+      score = clamp(score,0,100);
+      const fake = score>=60;
+      if(!why.length){ why.push('Healthy activity signals'); }
+      return { score, fake, why: why.join('; ') };
+    }
+
+    function simulateProgress(total, cbDone){
+      let p=0;
+      progressText.textContent='Analyzing…';
+      const it = setInterval(()=>{
+        p = clamp(p + Math.random()*18, 0, 100);
+        progressBar.style.width = p+'%';
+        if(p>=100){
+          clearInterval(it);
+          setTimeout(cbDone, 250);
+        }
+      }, 160);
+    }
+
+    function ingest(rows){
+      state.rows = rows.map((r,i)=>{
+        const res = analyze(r);
+        return { id: i+1, ...r, ...res };
+      });
+      updateStats();
+      applyFilters();
+      refreshCharts();
+    }
+
+    function updateStats(){
+      const total = state.rows.length;
+      const fake = state.rows.filter(r=>r.fake).length;
+      const real = total - fake;
+      $('#statTotal').textContent = fmt.format(total);
+      $('#statFake').textContent = fmt.format(fake);
+      $('#statReal').textContent = fmt.format(real);
+    }
+
+    function applyFilters(){
+      const q = state.search.toLowerCase();
+      state.filtered = state.rows.filter(r=>{
+        const matchSearch = r.username.toLowerCase().includes(q);
+        const matchFilter = state.filter==='all' ? true : (state.filter==='fake'? r.fake : !r.fake);
+        return matchSearch && matchFilter;
+      });
+      sortData();
+      state.page = 1;
+      renderTable();
+    }
+
+    function sortData(){
+      const key = state.sortKey, dir = state.sortDir==='asc'?1:-1;
+      state.filtered.sort((a,b)=>{
+        const A=a[key], B=b[key];
+        if(typeof A==='number' && typeof B==='number'){ return (A-B)*dir; }
+        return (''+A).localeCompare((''+B))*dir;
+      });
+    }
+
+    function renderTable(){
+      const start = (state.page-1)*state.pageSize;
+      const rows = state.filtered.slice(start, start+state.pageSize);
+      // Efficient update: rebuild tbody content once
+      tbody.innerHTML = '';
+      for(const r of rows){
+        const tr = document.createElement('tr');
+        tr.className = 'table-row';
+        if(r.fake) tr.classList.add('glow-red');
+        tr.innerHTML = `
+          <td class="px-4 py-3"><span class="underline decoration-dotted cursor-help" data-tip="${escapeHtml(r.why)}">@${escapeHtml(r.username)}</span></td>
+          <td class="px-4 py-3">${fmt.format(r.followers)}</td>
+          <td class="px-4 py-3">${fmt.format(r.following)}</td>
+          <td class="px-4 py-3">${escapeHtml(r.created)}</td>
+          <td class="px-4 py-3">${fmt.format(r.posts)}</td>
+          <td class="px-4 py-3">
+            <span class="badge ${r.fake?'text-[var(--bad)]':'text-[var(--good)]'}">${r.score}</span>
+          </td>
+          <td class="px-4 py-3">
+            <span class="text-slate-300 text-xs underline decoration-dotted cursor-help" data-tip="${escapeHtml(r.why)}">Why flagged?</span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+      const total = state.filtered.length;
+      const end = Math.min(start + rows.length, total);
+      $('#paginationInfo').textContent = `${total? start+1:0}–${end} of ${total}`;
+      $('#pageNum').textContent = state.page;
+    }
+
+    function escapeHtml(s){ return s.replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[m])); }
+
+    // Sorting
+    $$('th[data-sort]').forEach(th=>{
+      th.addEventListener('click', ()=>{
+        const k = th.getAttribute('data-sort');
+        if(state.sortKey===k){ state.sortDir = state.sortDir==='asc'? 'desc':'asc'; }
+        else { state.sortKey=k; state.sortDir='asc'; }
+        sortData(); renderTable();
+      });
+      th.setAttribute('title','Click to sort'); // micro hint
+    });
+
+    // Pagination
+    $('#prevPage').addEventListener('click', ()=>{
+      if(state.page>1){ state.page--; renderTable(); }
+    });
+    $('#nextPage').addEventListener('click', ()=>{
+      const maxPage = Math.ceil(state.filtered.length / state.pageSize)||1;
+      if(state.page<maxPage){ state.page++; renderTable(); }
+    });
+
+    // Filters & search
+    $('#filterAll').addEventListener('click', ()=>{ state.filter='all'; applyFilters(); });
+    $('#filterReal').addEventListener('click', ()=>{ state.filter='real'; applyFilters(); });
+    $('#filterFake').addEventListener('click', ()=>{ state.filter='fake'; applyFilters(); });
+    $('#searchInput').addEventListener('input', (e)=>{ state.search=e.target.value; applyFilters(); });
+
+    // Drag & drop
+    ;['dragenter','dragover'].forEach(ev=> dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.add('glow-green'); }));
+    ;['dragleave','drop'].forEach(ev=> dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.remove('glow-green'); }));
+    dropzone.addEventListener('drop', e=>{
+      const file = e.dataTransfer.files[0];
+      if(file && file.type.includes('csv') || file.name.endsWith('.csv')) handleFile(file);
+    });
+    fileInput.addEventListener('change', e=>{
+      const file = e.target.files[0];
+      if(file) handleFile(file);
+    });
+
+    function handleFile(file){
+      progressBar.style.width='0%';
+      simulateProgress(100, ()=>{});
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        const base = parseCSV(reader.result);
+        // Basic validation
+        if(!base.length){ progressText.textContent='No rows found. Ensure CSV has: username,followers,following,created,posts'; return; }
+        // Simulate a slight delay to let progress reach 100
+        setTimeout(()=>{
+          ingest(base);
+          progressText.textContent='Analysis complete';
+          progressBar.style.width='100%';
+        }, 400);
+      };
+      reader.readAsText(file);
+      progressText.textContent='Uploading…';
+    }
+
+    // Charts
+    let donut, pie, bar;
+    function refreshCharts(){
+      const total = state.rows.length;
+      const fake = state.rows.filter(r=>r.fake).length;
+      const real = total - fake;
+      const buckets = { Low:0, Medium:0, High:0 };
+      for(const r of state.rows){
+        if(r.score<35) buckets.Low++;
+        else if(r.score<60) buckets.Medium++;
+        else buckets.High++;
+      }
+
+      const donutCtx = document.getElementById('donutChart').getContext('2d');
+      const pieCtx = document.getElementById('pieChart').getContext('2d');
+      const barCtx = document.getElementById('barChart').getContext('2d');
+
+      const donutData = {
+        labels:['Real','Fake'],
+        datasets:[{ data:[real,fake], backgroundColor:['rgba(34,197,94,0.85)','rgba(239,68,68,0.85)'], borderColor:['rgba(34,197,94,1)','rgba(239,68,68,1)'], borderWidth:1 }]
+      };
+      const pieData = JSON.parse(JSON.stringify(donutData));
+      const barData = {
+        labels:Object.keys(buckets),
+        datasets:[{ data:Object.values(buckets), backgroundColor:['rgba(34,197,94,0.7)','rgba(245,158,11,0.8)','rgba(239,68,68,0.85)'] }]
+      };
+
+      const optsCommon = {
+        plugins:{
+          legend:{labels:{color:'#cbd5e1'}},
+          tooltip:{enabled:true, callbacks:{
+            label:(ctx)=>{
+              const val = ctx.parsed;
+              const sum = ctx.dataset.data.reduce((a,b)=>a+b,0)||1;
+              const pct = Math.round((val/sum)*100);
+              return `${val} (${pct}%)`;
+            }
+          }}
+        },
+        animation:{duration:700, easing:'easeOutCubic'},
+      };
+      const scaleOpts = { scales:{ x:{ ticks:{color:'#94a3b8'} , grid:{color:'rgba(148,163,184,0.15)'} }, y:{ ticks:{color:'#94a3b8'}, grid:{color:'rgba(148,163,184,0.12)'} } } };
+
+      if(donut) donut.destroy(); if(pie) pie.destroy(); if(bar) bar.destroy();
+      donut = new Chart(donutCtx, { type:'doughnut', data:donutData, options:{...optsCommon, cutout:'62%'} });
+      pie = new Chart(pieCtx, { type:'pie', data:pieData, options:optsCommon });
+      bar = new Chart(barCtx, { type:'bar', data:barData, options:{...optsCommon, ...scaleOpts} });
+    }
+
+    // Tooltip handling
+    const ttp = $('#tooltip');
+    document.addEventListener('mousemove', (e)=>{
+      const target = e.target.closest('[data-tip]');
+      if(target){
+        ttp.classList.remove('hidden');
+        ttp.textContent = target.getAttribute('data-tip');
+        const pad = 16;
+        let x = e.clientX + 16, y = e.clientY + 16;
+        if(x + ttp.offsetWidth > window.innerWidth) x = e.clientX - ttp.offsetWidth - pad;
+        if(y + ttp.offsetHeight > window.innerHeight) y = e.clientY - ttp.offsetHeight - pad;
+        ttp.style.left = x+'px';
+        ttp.style.top = y+'px';
+      }else{
+        ttp.classList.add('hidden');
+      }
+    });
+
+    // Sound toggle (simulated)
+    const soundToggle = $('#soundToggle'), soundKnob = $('#soundKnob'), soundNote = $('#soundNote');
+    soundToggle.addEventListener('change', ()=>{
+      if(soundToggle.checked){
+        soundKnob.style.left='calc(100% - 1.25rem)';
+        soundNote.textContent = 'On (visual only here)';
+        // small visual ping
+        document.body.animate([{filter:'brightness(1.0)'},{filter:'brightness(1.15)'},{filter:'brightness(1.0)'}], {duration:400});
+      }else{
+        soundKnob.style.left='0.125rem';
+        soundNote.textContent = 'Simulated (audio not supported here)';
+      }
+    });
+
+    // Chatbot
+    const chatToggle = $('#chatToggle'), chatPanel = $('#chatPanel'), chatClose=$('#chatClose'), botOpen=$('#botOpen');
+    const chatLog = $('#chatLog'), chatInput=$('#chatInput'), chatSend=$('#chatSend');
+    function openChat(){ chatPanel.classList.remove('hidden'); chatPanel.animate([{opacity:0, transform:'translateY(8px)'},{opacity:1, transform:'translateY(0)'}],{duration:200}); }
+    function closeChat(){ chatPanel.classList.add('hidden'); }
+    chatToggle.addEventListener('click', openChat);
+    chatClose.addEventListener('click', closeChat);
+    botOpen.addEventListener('click', openChat);
+
+    function addMsg(text, from='bot'){
+      const row = document.createElement('div');
+      row.className='flex';
+      row.innerHTML = `<div class="text-sm ${from==='bot'?'text-slate-200':'text-[var(--neon2)]'}">${escapeHtml(text)}</div>`;
+      chatLog.appendChild(row);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+    function botReply(q){
+      const map = {
+        'upload': 'Click “Upload CSV” or drop a file into the upload zone. We’ll show progress and then your results.',
+        'flag': 'We flag accounts using signals like low activity, extreme follow ratios, new creation dates, and suspicious keywords.',
+        'chart': 'Charts summarize Real vs Fake and risk buckets. Hover for exact counts and percentages.',
+      };
+      q=q.toLowerCase();
+      if(q.includes('upload')) return map.upload;
+      if(q.includes('flag')) return map.flag;
+      if(q.includes('chart')) return map.chart;
+      return 'I can help with uploads, flags, and charts. Try asking “How are fakes flagged?”';
+    }
+    $$('.bot-q').forEach(btn=>btn.addEventListener('click', ()=>{ addMsg(btn.textContent,'user'); setTimeout(()=>addMsg(botReply(btn.textContent),'bot'), 350); }));
+    chatSend.addEventListener('click', ()=>{
+      const t = chatInput.value.trim();
+      if(!t) return;
+      addMsg(t,'user'); chatInput.value='';
+      setTimeout(()=> addMsg(botReply(t),'bot'), 400);
+    });
+    chatInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ chatSend.click(); } });
+
+    // Contact form validation (demo)
+    $('#contactForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const name = $('#cName').value.trim();
+      const email = $('#cEmail').value.trim();
+      const msg = $('#cMsg').value.trim();
+      let ok = true;
+      $('#errName').classList.toggle('hidden', !!name); if(!name) ok=false;
+      const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      $('#errEmail').classList.toggle('hidden', validEmail); if(!validEmail) ok=false;
+      $('#errMsg').classList.toggle('hidden', !!msg); if(!msg) ok=false;
+      if(ok){
+        $('#contactToast').classList.remove('hidden');
+        e.target.reset();
+        setTimeout(()=>$('#contactToast').classList.add('hidden'), 2800);
+      }
+    });
+
+    // Init with tiny sample so charts don’t look empty
+    const sample = [
+      {username:'alex', followers:120, following:80, created:'2018', posts:34},
+      {username:'promo_deals99', followers:9, following:550, created:'2024', posts:1},
+      {username:'luna', followers:980, following:120, created:'2016', posts:240},
+      {username:'new_user_123', followers:14, following:30, created:'2025', posts:0},
+      {username:'bot_check', followers:3, following:420, created:'2023', posts:0},
+      {username:'samuel', followers:220, following:210, created:'2019', posts:76},
+    ];
+    ingest(sample);
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'97e59813a46ca7e7',t:'MTc1Nzc0NTAwNy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
